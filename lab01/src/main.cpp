@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <cstring>
 #include <iostream>
+#include <chrono> // added for timing
 
 #define OPERATION_COUNT 100000
 #define DEFAULT_GENERATOR_SEED 0
@@ -119,6 +120,20 @@ int task_1() {
         std::queue<SetEvent> sequence;
 
         // A01: Add a valid sequence of 10+ instructions
+        sequence.push(SetEvent(SetOperator::Add, 1, true));
+        sequence.push(SetEvent(SetOperator::Add, 2, true));
+        sequence.push(SetEvent(SetOperator::Add, 3, true));
+        sequence.push(SetEvent(SetOperator::Add, 4, true));
+        sequence.push(SetEvent(SetOperator::Add, 5, true));
+        sequence.push(SetEvent(SetOperator::Add, 6, true));
+        sequence.push(SetEvent(SetOperator::Add, 7, true));
+        sequence.push(SetEvent(SetOperator::Add, 7, false));
+        sequence.push(SetEvent(SetOperator::Add, 1, false));
+        sequence.push(SetEvent(SetOperator::Add, 11, true));
+        sequence.push(SetEvent(SetOperator::Add, 12, true));
+        sequence.push(SetEvent(SetOperator::Add, 13, true));
+        sequence.push(SetEvent(SetOperator::Add, 1, false));
+
 
         StdSet set;
         test_events(&set, &sequence, true);
@@ -130,6 +145,13 @@ int task_1() {
         std::queue<SetEvent> sequence;
 
         // A01: Add a sequence that fails an `add(3)` after 5 instructions
+        sequence.push(SetEvent(SetOperator::Add, 3, true));
+        sequence.push(SetEvent(SetOperator::Add, 2, true));
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Add, 3, true)); //  fifth instruction fails here
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Add, 1, false));
 
         StdSet set;
         test_events(&set, &sequence, true);
@@ -141,6 +163,11 @@ int task_1() {
         std::queue<SetEvent> sequence;
 
         // A01: Add a sequence that fails an `contains(3)` after 5 instructions
+        sequence.push(SetEvent(SetOperator::Add, 3, true)); // now contains 3
+        sequence.push(SetEvent(SetOperator::Add, 2, true));
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Contains, 3, false)); // should be true since 3 in set
 
         StdSet set;
         test_events(&set, &sequence, true);
@@ -152,6 +179,12 @@ int task_1() {
         std::queue<SetEvent> sequence;
 
         // A01: Add a sequence that fails an `remove(3)` after 5 instructions
+        sequence.push(SetEvent(SetOperator::Add, 2, true)); 
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Add, 2, false));
+        sequence.push(SetEvent(SetOperator::Remove, 3, true)); // no 3 in set so should return false
+
 
         StdSet set;
         test_events(&set, &sequence, true);
@@ -186,6 +219,8 @@ int task_3() {
     bool valid = true;
     std::cout << "# Task 3: Coarse Set" << std::endl;
 
+    auto start = std::chrono::steady_clock::now();
+
     for (int test_run = 0; test_run < 8; test_run++) {
         std::cout << "## Testing `CoarseSet` with 8 thread and seed: " << test_run << std::endl;
         valid &= test_set_n_threads<CoarseSet>(8, DEFAULT_OP_MOD);
@@ -195,6 +230,10 @@ int task_3() {
             break;
         }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    double ms = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end - start).count();
+    std::cout << "CoarseSet total duration: " << ms << " ms" << std::endl;
 
     if (valid) {
         return 0;
@@ -208,6 +247,8 @@ int task_4() {
     bool valid = true;
     std::cout << "# Task 4: Fine Set" << std::endl;
 
+    auto start = std::chrono::steady_clock::now();
+
     for (int test_run = 0; test_run < 8; test_run++) {
         std::cout << "## Testing `FineSet` with 8 thread and seed: " << test_run << std::endl;
         valid &= test_set_n_threads<FineSet>(8, DEFAULT_OP_MOD);
@@ -217,6 +258,10 @@ int task_4() {
             break;
         }
     }
+
+    auto end = std::chrono::steady_clock::now();
+    double ms = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end - start).count();
+    std::cout << "FineSet total duration: " << ms << " ms" << std::endl;
 
     if (valid) {
         return 0;

@@ -26,10 +26,18 @@ public:
         monitor(monitor)
     {
         // A03: Initiate the internal state
+        CoarseSetNode* tail = new CoarseSetNode{ std::numeric_limits<int>::max(), nullptr };
+        head = new CoarseSetNode{ std::numeric_limits<int>::min(), tail };
     }
 
     ~CoarseSet() override {
         // A03: Cleanup any memory that was allocated
+        CoarseSetNode* cur = head;
+        while (cur) {
+            CoarseSetNode* nxt = cur->next;
+            delete cur;
+            cur = nxt;
+        }
     }
 
     bool add(int elem) override {
@@ -37,7 +45,22 @@ public:
         // A03: Add code to insert the element into the set and update `result`.
         //      Also make sure, to insert the event inside the locked region of
         //      the linearization point.
+        lock.lock();
+        CoarseSetNode* prev = head;
+        CoarseSetNode* cur = head->next;
+        while (cur->value < elem) {
+            prev = cur;
+            cur = cur->next;
+        } // iter until cur value >= elem
+        if (cur->value == elem) {
+            result = false;
+        } else {
+            CoarseSetNode* node = new CoarseSetNode{ elem, cur };
+            prev->next = node;
+            result = true;
+        }
         this->monitor->add(SetEvent(SetOperator::Add, elem, result));
+        lock.unlock();
         return result;
     }
 
@@ -46,7 +69,22 @@ public:
         // A03: Add code to remove the element from the set and update `result`.
         //      Also make sure, to insert the event inside the locked region of
         //      the linearization point.
+        lock.lock();
+        CoarseSetNode* prev = head;
+        CoarseSetNode* cur = head->next;
+        while (cur->value < elem) {
+            prev = cur;
+            cur = cur->next;
+        } // iter until cur value >= elem
+        if (cur->value == elem) {
+            prev->next = cur->next;
+            delete cur;
+            result = true;
+        } else {
+            result = false;
+        }
         this->monitor->add(SetEvent(SetOperator::Remove, elem, result));
+        lock.unlock();
         return result;
     }
 
@@ -55,14 +93,27 @@ public:
         // A03: Add code to check if the element is inside the set and update `result`.
         //      Also make sure, to insert the event inside the locked region of
         //      the linearization point.
+        lock.lock();
+        CoarseSetNode* cur = head->next;
+        while (cur->value < elem) {
+            cur = cur->next;
+        }
+        result = (cur->value == elem);
         this->monitor->add(SetEvent(SetOperator::Contains, elem, result));
+        lock.unlock();
         return result;
     }
 
     void print_state() override {
         // A03: Optionally, add code to print the state. This is useful for debugging,
         // but not part of the assignment
-        std::cout << "CoarseSet {...}";
+        std::cout << "Coarse Set {";
+        for (CoarseSetNode* cur = head->next; cur != nullptr && cur->next != nullptr; cur = cur->next) {
+            if (cur->value == std::numeric_limits<int>::max()) break;
+            std::cout << cur->value;
+            if (cur->next && cur->next->value != std::numeric_limits<int>::max()) std::cout << ", ";
+        }
+        std::cout << "}";
     }
 };
 

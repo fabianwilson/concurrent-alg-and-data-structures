@@ -6,6 +6,9 @@
 #include <mutex>
 #include <atomic>
 
+#include <limits>
+#include <iostream>
+
 /// The node used for the linked list implementation of a set in the [`OptimisticSet`]
 /// class.
 struct OptimisticSetNode {
@@ -31,38 +34,123 @@ private:
 public:
     OptimisticSet()
     {
-        // A01: Initiate the internal state
+        // create sentinel nodes: head = INT_MIN, tail = INT_MAX
+        OptimisticSetNode* tail = new OptimisticSetNode();
+        tail->value = std::numeric_limits<int>::max();
+        tail->next.store(nullptr);
+
+        OptimisticSetNode* h = new OptimisticSetNode();
+        h->value = std::numeric_limits<int>::min();
+        h->next.store(tail);
+
+        head.store(h);
     }
 
     ~OptimisticSet() override {
-        // A01: Cleanup any memory that was allocated
-        // This is optional for the optimistic set since it might be tricky to implement and is out
-        // of scope for the exercise, but remember to document this in your report.
+        OptimisticSetNode* cur = head.load();
+        while (cur) {
+            OptimisticSetNode* nxt = cur->next.load();
+            delete cur;
+            cur = nxt;
+        }
     }
 
 private:
     bool validate(OptimisticSetNode* p, OptimisticSetNode* c) {
-        // A01: Implement the `validate` function used during
-        // optimistic synchronization.
+        OptimisticSetNode* node = head.load();
+        while (node && node->value <= p->value) {
+            if (node == p) {
+                return (p->next.load() == c);
+            }
+            node = node->next.load();
+        }
         return false;
     }
 
 public:
     bool add(int elem) override {
         bool result = false;
-        // A01: Add code to insert the element into the set and update `result`.
-        return result;
+        while (true) {
+            OptimisticSetNode* p = head.load();
+            OptimisticSetNode* c = p->next.load();
+
+            while (c->value < elem) {
+                p = c;
+                c = c->next.load();
+            }
+
+            p->lock.lock();
+            c->lock.lock();
+
+            if (!validate(p, c)) {
+                c->lock.unlock();
+                p->lock.unlock();
+                continue; 
+            }
+
+            if (c->value == elem) {
+                // alredy in set
+                result = false;
+                c->lock.unlock();
+                p->lock.unlock();
+                return result;
+            } else {
+                OptimisticSetNode* node = new OptimisticSetNode();
+                node->value = elem;
+                node->next.store(c);
+                p->next.store(node);
+                result = true;
+                c->lock.unlock();
+                p->lock.unlock();
+                return result;
+            }
+        }
     }
 
     bool rmv(int elem) override {
         bool result = false;
-        // A01: Add code to remove the element from the set and update `result`.
-        return result;
+        while (true) {
+            OptimisticSetNode* p = head.load();
+            OptimisticSetNode* c = p->next.load();
+            // find window
+            while (c->value < elem) {
+                p = c;
+                c = c->next.load();
+            }
+
+            p->lock.lock();
+            c->lock.lock();
+
+            if (!validate(p, c)) {
+                c->lock.unlock();
+                p->lock.unlock();
+                continue;
+            }
+
+            if (c->value != elem) {
+                result = false;
+                c->lock.unlock();
+                p->lock.unlock();
+                return result;
+            } else {
+                OptimisticSetNode* cnext = c->next.load();
+                p->next.store(cnext);
+                c->lock.unlock();
+                p->lock.unlock();
+                // delete c;
+                result = true;
+                return result;
+            }
+        }
     }
 
     bool ctn(int elem) override {
         bool result = false;
-        // A01: Add code to check if the element is inside the set and update `result`.
+        OptimisticSetNode* cur = head.load()->next.load();
+        while (cur && cur->value < elem) {
+            cur = cur->next.load();
+        }
+        result = (cur && cur->value == elem);
         return result;
     }
 

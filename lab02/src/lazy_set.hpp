@@ -5,6 +5,8 @@
 
 #include <mutex>
 #include <atomic>
+#include <limits>
+#include <iostream>
 
 /// The node used for the linked list implementation of a set in the [`LazySet`] class.
 struct LazySetNode {
@@ -25,43 +27,119 @@ struct LazySetNode {
 /// A set implementation using a linked list with optimistic syncronization.
 class LazySet: public Set {
 private:
-    // A02: You can add or remove fields as needed. Just having the `head`
-    // pointer should be sufficient for this task
     std::atomic<LazySetNode*> head;
 public:
     LazySet()
     {
-        // A02: Initiate the internal state
+        LazySetNode* tail = new LazySetNode();
+        tail->value = std::numeric_limits<int>::max();
+        tail->next.store(nullptr);
+        tail->mark.store(false);
+
+        LazySetNode* h = new LazySetNode();
+        h->value = std::numeric_limits<int>::min();
+        h->next.store(tail);
+        h->mark.store(false);
+
+        head.store(h);
     }
 
     ~LazySet() override {
-        // A02: Cleanup any memory that was allocated
-        // This is optional for the lazy set since it might be tricky to implement and is out
-        // of scope for this exercise, but remember to document this in your report.
+        LazySetNode* cur = head.load();
+        while (cur) {
+            LazySetNode* nxt = cur->next.load();
+            delete cur;
+            cur = nxt;
+        }
     }
 
 private:
     LazySetNode* locate(int value) {
-        // A02: Implement the `locate` function used for lazy synchronization.
-        return nullptr;
+        LazySetNode* cur = head.load();
+        LazySetNode* next = cur->next.load();
+        while (next && next->value < value) {
+            cur = next;
+            next = cur->next.load();
+        }
+        return cur;
     }
 
 public:
     bool add(int elem) override {
         bool result = false;
-        // A02: Add code to insert the element into the set and update `result`.
-        return result;
+        while (true) {
+            LazySetNode* p = locate(elem);
+            LazySetNode* c = p->next.load();
+
+            p->lock.lock();
+            c->lock.lock();
+
+            if (p->mark.load() || c->mark.load() || p->next.load() != c) {
+                c->lock.unlock();
+                p->lock.unlock();
+                continue;
+            }
+
+            if (c->value == elem) {
+                result = false;
+                c->lock.unlock();
+                p->lock.unlock();
+                return result;
+            } else {
+                LazySetNode* node = new LazySetNode();
+                node->value = elem;
+                node->mark.store(false);
+                node->next.store(c);
+                p->next.store(node);
+                result = true;
+                c->lock.unlock();
+                p->lock.unlock();
+                return result;
+            }
+        }
     }
 
     bool rmv(int elem) override {
         bool result = false;
-        // A02: Add code to remove the element from the set and update `result`.
-        return result;
+        while (true) {
+            LazySetNode* p = locate(elem);
+            LazySetNode* c = p->next.load();
+
+            p->lock.lock();
+            c->lock.lock();
+
+            if (p->mark.load() || c->mark.load() || p->next.load() != c) {
+                c->lock.unlock();
+                p->lock.unlock();
+                continue;
+            }
+
+            if (c->value != elem) {
+                result = false;
+                c->lock.unlock();
+                p->lock.unlock();
+                return result;
+            } else {
+                
+                c->mark.store(true);
+                
+                LazySetNode* cnext = c->next.load();
+                p->next.store(cnext);
+                c->lock.unlock();
+                p->lock.unlock();
+                result = true;
+                return result;
+            }
+        }
     }
 
     bool ctn(int elem) override {
         bool result = false;
-        // A02: Add code to check if the element is inside the set and update `result`.
+        LazySetNode* cur = head.load()->next.load();
+        while (cur && cur->value < elem) {
+            cur = cur->next.load();
+        }
+        result = (cur && cur->value == elem && !cur->mark.load());
         return result;
     }
 

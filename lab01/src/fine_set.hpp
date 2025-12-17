@@ -81,38 +81,7 @@ public:
     }
 
     bool rmv(int elem) override {
-        bool result = false;
-        // A04: Add code to remove the element from the set and update `result`.
-        //      Also make sure, to insert the event inside the locked region of
-        //      the linearization point.
-        FineSetNode* prev = head;
-        prev->lock.lock();
-        FineSetNode* cur = prev->next;
-        cur->lock.lock();
-
-        while (cur->value < elem) {
-            prev->lock.unlock();
-            prev = cur;
-            cur = cur->next;
-            cur->lock.lock();
-        } // iter until cur value >= elem
-
-        if (cur->value == elem) {
-            prev->next = cur->next;
-            result = true;
-            this->monitor->add(SetEvent(SetOperator::Remove, elem, result));
-            
-            cur->lock.unlock();
-            prev->lock.unlock();
-            delete cur;
-            return result;
-        } else {
-            result = false;
-            this->monitor->add(SetEvent(SetOperator::Remove, elem, result));
-            cur->lock.unlock();
-            prev->lock.unlock();
-            return result;
-        }
+        
     }
 
     bool ctn(int elem) override {

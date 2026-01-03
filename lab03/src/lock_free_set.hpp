@@ -6,7 +6,7 @@
 const uintptr_t FLAG_MASK = 0x00000001;
 const uintptr_t PTR_MASK = ~FLAG_MASK;
 
-#define ATOMIC_PTR_AND_FLAG_MERGE(ptr, flag) (((uintptr_t) ptr) | (flag ? FLAG_MASK : 0))
+#define ATOMIC_PTR_AND_FLAG_MERGE(ptr, flag) (((uintptr_t)ptr) | (flag ? FLAG_MASK : 0))
 
 /// Memory addresses of allocations on modern processors are (at least) 4 byte aligned,
 /// this means that the lower 2 bytes of an allocated pointer are always 0. By using
@@ -18,11 +18,13 @@ const uintptr_t PTR_MASK = ~FLAG_MASK;
 /// into an allocation. If you always allocate a node using `malloc` or `new` this
 /// will not be a problem here.
 template <typename T>
-class AtomicPtrAndFlag {
+class AtomicPtrAndFlag
+{
     std::atomic<intptr_t> ptr;
 
 public:
-    AtomicPtrAndFlag(T* ptr, bool flag) {
+    AtomicPtrAndFlag(T *ptr, bool flag)
+    {
         this->ptr = ATOMIC_PTR_AND_FLAG_MERGE(ptr, flag);
     }
 
@@ -30,7 +32,8 @@ public:
     /// updated if the current pointer and mark is equal to the ones
     /// given in the `test_*` arguments. The operation returns true
     /// if the comparison was successful and the value was updated.
-    bool cas(T* test_ptr, T* new_ptr, bool test_mark, bool new_mark) {
+    bool cas(T *test_ptr, T *new_ptr, bool test_mark, bool new_mark)
+    {
         intptr_t test = ATOMIC_PTR_AND_FLAG_MERGE(test_ptr, test_mark);
         intptr_t set = ATOMIC_PTR_AND_FLAG_MERGE(new_ptr, new_mark);
         return this->ptr.compare_exchange_strong(test, set);
@@ -38,7 +41,8 @@ public:
 
     /// This tries to set the flag to `true`. It returns `true`,
     /// if the pointer matched and the value was update.
-    bool try_set_mark(T* test_ptr) {
+    bool try_set_mark(T *test_ptr)
+    {
         return cas(test_ptr, test_ptr, false, true);
     }
 
@@ -58,19 +62,21 @@ public:
     /// LockFreeSetNode* ptr = std::get<0>(tuple);
     /// bool mark = std::get<1>(tuple);
     /// ```
-    std::tuple<T*, bool> get() {
+    std::tuple<T *, bool> get()
+    {
         intptr_t value = this->ptr.load();
-        T* ptr = (T*)(value & PTR_MASK);
+        T *ptr = (T *)(value & PTR_MASK);
         bool mark = (value & FLAG_MASK);
 
-        return std::tuple<T*, bool>(ptr, mark);
+        return std::tuple<T *, bool>(ptr, mark);
     }
 
     /// This returns the stored pointer.
     ///
     /// Note: If you want to retrieve both the pointer and mark, you should use
     /// `AtomicPtrAndFlag::get()` to access both values atomically at once.
-    T* get_ptr() {
+    T *get_ptr()
+    {
         return std::get<0>(this->get());
     }
 
@@ -78,80 +84,170 @@ public:
     ///
     /// Note: If you want to retrieve both the pointer and mark, you should use
     /// `AtomicPtrAndFlag::get()` to access both values atomically at once.
-    bool get_flag() {
+    bool get_flag()
+    {
         return std::get<1>(this->get());
     }
 };
 
-struct LockFreeSetNode {
+struct LockFreeSetNode
+{
     // A02: You can add or remove fields as needed.
     int value;
     AtomicPtrAndFlag<LockFreeSetNode> next;
 
-    LockFreeSetNode(int value, LockFreeSetNode* next) :
-        value(value),
-        next(AtomicPtrAndFlag(next, false))
-    {}
+    LockFreeSetNode(int value, LockFreeSetNode *next) : value(value),
+                                                        next(AtomicPtrAndFlag(next, false))
+    {
+    }
 };
 
-struct LockFreeWindow {
+struct LockFreeWindow
+{
     // A02: You can add or remove fields as needed.
-    LockFreeSetNode* pred;
-    LockFreeSetNode* curr;
+    LockFreeSetNode *pred;
+    LockFreeSetNode *curr;
 
-    LockFreeWindow(LockFreeSetNode* pred, LockFreeSetNode* curr)
+    LockFreeWindow(LockFreeSetNode *pred, LockFreeSetNode *curr)
         : pred(pred), curr(curr)
-    {}
+    {
+    }
 };
 
 /// A template for the implementation of a lock-free set, as shown in chapter
 /// 9.8 in the course book. There this data structure is called `LockFreeList`.
-class LockFreeSet: public Set {
+class LockFreeSet : public Set
+{
 private:
     // A02: You can add or remove fields as needed.
-    LockFreeSetNode* head;
+    LockFreeSetNode *head;
 
-    LockFreeWindow find(int key) {
+    LockFreeWindow find(int key)
+    {
         // A02: Implement the `find()` method as shown in figure 9.24 in the book
-        //      Here you can use `this->head` instead of having the pointer as a
-        //      function parameter.
-        return LockFreeWindow(nullptr, nullptr);
+
+    
+        LockFreeSetNode *pred = nullptr;
+        LockFreeSetNode *curr = nullptr;
+        LockFreeSetNode *succ = nullptr;
+        bool marked = false;
+        bool snip = false;
+    retry:    while (true)
+        {
+            pred = this->head;
+            curr = pred->next.get_ptr();
+            while (true)
+            {
+                std::tie(succ, marked) = curr->next.get();
+                while (marked)
+                {
+                    snip = pred->next.cas(curr, succ, false, false);
+                    if (!snip)
+                        goto retry;
+                    curr = succ;
+                    std::tie(succ, marked) = curr->next.get();
+                }
+                if (curr->value >= key)
+                {
+                    return LockFreeWindow(pred, curr);
+                }
+                pred = curr;
+                curr = succ;
+            }
+        }
     }
 
 public:
-    LockFreeSet() {
+    LockFreeSet()
+    {
         // A02: Initialize the internal state.
-        //      - The book doesn't specify how the state should be initialized.
-        //        The code used in the book requires that there is always a valid
-        //        head and tail pointer, since null chases are not specifically
-        //        handled. The code below initializes a head and tail pointer.
-        //        You're welcome to modify the code as needed for your implementation.
-        LockFreeSetNode* tail = new LockFreeSetNode(INT_MAX, nullptr);
+        LockFreeSetNode *tail = new LockFreeSetNode(INT_MAX, nullptr);
         head = new LockFreeSetNode(INT_MIN, tail);
     }
-    ~LockFreeSet() {
+    ~LockFreeSet()
+    {
         // A02: Cleanup any memory that was allocated
+        LockFreeSetNode *cur = this->head;
+        while (cur)
+        {
+            LockFreeSetNode *nxt = cur->next.get_ptr();
+            delete cur;
+            cur = nxt;
+        }
     }
 
-    bool add(int value) override {
+    bool add(int value) override
+    {
         bool result = false;
         // A02: Add code to insert the element into the set and update `result`.
+        while (true)
+        {
+            LockFreeWindow win = find(value);
+            LockFreeSetNode *pred = win.pred;
+            LockFreeSetNode *curr = win.curr;
+
+            if (curr->value == value)
+            {
+                return false;
+            }
+            else
+            {
+                LockFreeSetNode *node = new LockFreeSetNode(value, curr);
+                if (pred->next.cas(curr, node, false, false))
+                {
+                    return true;
+                }
+                else
+                {
+                    delete node;
+                    continue;
+                }
+            }
+        }
         return result;
     }
 
-    bool rmv(int value) override {
+    bool rmv(int value) override
+    {
         bool result = false;
         // A02: Add code to remove the element from the set and update `result`.
+        while (true)
+        {
+            LockFreeWindow win = find(value);
+            LockFreeSetNode *pred = win.pred;
+            LockFreeSetNode *curr = win.curr;
+
+            if (curr->value != value)
+            {
+                return false;
+            }
+            else
+            {
+                LockFreeSetNode *succ = curr->next.get_ptr();
+                if (!curr->next.try_set_mark(succ))
+                {
+                    continue; // retry
+                }
+                
+                pred->next.cas(curr, succ, false, false);
+                return true;
+            }
+        }
         return result;
     }
 
-    bool ctn(int value) override {
-        bool result = false;
-        // A02: Add code to check if the element is in the set and update `result`.
-        return result;
+    bool ctn(int value) override
+    {
+        LockFreeSetNode* curr = this->head;
+        while (curr->value < value) {
+            curr = curr->next.get_ptr();
+        }
+        auto [succ, marked] = curr->next.get();
+        return (curr->value == value && !marked);
     }
 
-    void print_state() override {
+    void print_state() override
+    {
         // A02: Optionally, add code to print the state. This is useful for debugging,
         // but not part of the assignment
         std::cout << "LockFreeSet {...}";

@@ -69,8 +69,59 @@ def plot_results(value_range, data):
     plt.tight_layout()
     plt.show()
 
+# run on tussigalo
+lock_free_set_results_2 = {
+    "0..8": {
+        "ctn10_add54_rmv36": [
+            {"threads": 1,  "time_ms": 17.2620,   "total_ops": 100000},
+            {"threads": 2,  "time_ms": 185.9329,  "total_ops": 200000},
+            {"threads": 4,  "time_ms": 329.9109,  "total_ops": 400000},
+            {"threads": 8,  "time_ms": 975.0449,  "total_ops": 800000},
+            {"threads": 16, "time_ms": 2049.9070, "total_ops": 1600000},
+        ],
+        "ctn50_add30_rmv20": [
+            {"threads": 1,  "time_ms": 20.1838,   "total_ops": 100000},
+            {"threads": 2,  "time_ms": 209.6760,  "total_ops": 200000},
+            {"threads": 4,  "time_ms": 393.2988,  "total_ops": 400000},
+            {"threads": 8,  "time_ms": 1093.7590, "total_ops": 800000},
+            {"threads": 16, "time_ms": 2281.4531, "total_ops": 1600000},
+        ],
+        "ctn90_add6_rmv4": [
+            {"threads": 1,  "time_ms": 17.0911,   "total_ops": 100000},
+            {"threads": 2,  "time_ms": 194.3540,  "total_ops": 200000},
+            {"threads": 4,  "time_ms": 342.0000,  "total_ops": 400000},
+            {"threads": 8,  "time_ms": 1009.5698, "total_ops": 800000},
+            {"threads": 16, "time_ms": 2094.2019, "total_ops": 1600000},
+        ],
+    },
+    "0..1028": {
+        "ctn10_add54_rmv36": [
+            {"threads": 1,  "time_ms": 40.9670,   "total_ops": 100000},
+            {"threads": 2,  "time_ms": 205.5222,  "total_ops": 200000},
+            {"threads": 4,  "time_ms": 489.7544,  "total_ops": 400000},
+            {"threads": 8,  "time_ms": 1268.1211, "total_ops": 800000},
+            {"threads": 16, "time_ms": 2594.9719, "total_ops": 1600000},
+        ],
+        "ctn50_add30_rmv20": [
+            {"threads": 1,  "time_ms": 234.6738,  "total_ops": 100000},
+            {"threads": 2,  "time_ms": 344.6682,  "total_ops": 200000},
+            {"threads": 4,  "time_ms": 666.6741,  "total_ops": 400000},
+            {"threads": 8,  "time_ms": 1387.1208, "total_ops": 800000},
+            {"threads": 16, "time_ms": 2832.4360, "total_ops": 1600000},
+        ],
+        "ctn90_add6_rmv4": [
+            {"threads": 1,  "time_ms": 386.7471,  "total_ops": 100000},
+            {"threads": 2,  "time_ms": 478.7290,  "total_ops": 200000},
+            {"threads": 4,  "time_ms": 753.6157,  "total_ops": 400000},
+            {"threads": 8,  "time_ms": 1403.9729, "total_ops": 800000},
+            {"threads": 16, "time_ms": 2912.6753, "total_ops": 1600000},
+        ],
+    }
+}
+
+
 # Plot for values 0..8
-plot_results("0..8", lock_free_set_results["0..8"])
+plot_results("0..8", lock_free_set_results_2["0..8"])
 
 # Plot for values 0..1028
-plot_results("0..1028", lock_free_set_results["0..1028"])
+plot_results("0..1028", lock_free_set_results_2["0..1028"])
